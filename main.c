@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <gtk/gtk.h>
 #include <unistd.h>
 #include <stdbool.h>
 
@@ -14,6 +15,15 @@ typedef struct person
 	char tel[MAX_TEL_CHAR];
 }pers;
 
+GtkBuilder *builder;
+pers *myRep;
+int rep_size=1;
+
+void if_print_button(GtkWidget *widget, gpointer data);
+void if_research_button(GtkWidget *widget, gpointer data);
+void if_save_button(GtkWidget *widget, gpointer data);
+void if_add_button(GtkWidget *widget, gpointer data);
+
 void input_person(pers *sp);
 void input_rep(void);
 void print_rep(void);
@@ -24,12 +34,11 @@ int get_file_size(FILE *file);
 
 void add_profil(void); // fonction ultime
 
-pers *myRep;
-size_t rep_size=1;
+void active_printed_list(void);
 
 int main(int argc, char *argv[])
 {
-	bool load = false;
+  bool load = false;
 	int choose, s1, s2, size;
 	FILE *tryfindfile = fopen("save.data", "r");
 	if(tryfindfile==NULL)
@@ -47,42 +56,78 @@ int main(int argc, char *argv[])
 		load_rep();
 	}
 	print_rep();
-	do
-	{
-		do
-		{
-			printf("\nMenu:\n");
-			printf("1-afficher le contenu du répertoire\n");
-			printf("2-chercher le numéro d'une personne\n");
-			printf("3-sauvegarder le répértoire\n");
-			printf("4-ajouter un profil\n");
-			printf("5-quitter le programme\n");
-			printf("Votre choix : ");
-			scanf("%d", &choose);
-		}
-		while(choose < 1 || choose > 5);
-		switch(choose)
-		{
-			case 1:
-				print_rep();
-				break;
-			case 2:
-				if(find_in_rep()==0)
-					printf("ERREUR : NOM INTROUVABLE\n");
-				break;
-			case 3:
-				save_rep();
-				break;
-			case 4:
-				add_profil();
-				break;
-			default: break;
-		}
-	}
-	while(choose!=5);
-	save_rep();
-	return 1;
+
+  gtk_init(&argc,&argv);
+
+  GtkWidget *window;
+  GtkWidget *print_button;
+  GtkWidget *research_button;
+  GtkWidget *save_button;
+  GtkWidget *add_button;
+  GtkWidget *hbox;
+
+  builder=gtk_builder_new();
+  if(gtk_builder_add_from_file(builder,"maquette.glade",NULL)==0)
+  {
+    fprintf(stderr,"ERROR\n");
+    exit(EXIT_FAILURE);
+  }
+  gtk_builder_connect_signals(builder,NULL);
+
+  active_printed_list();
+
+  window=GTK_WIDGET(gtk_builder_get_object(builder,"window"));
+  gtk_window_set_title(GTK_WINDOW(window),"default");
+  gtk_window_set_default_size(GTK_WINDOW(window),800,600);
+  g_signal_connect(window,"destroy",gtk_main_quit,NULL);
+
+  print_button=GTK_WIDGET(gtk_builder_get_object(builder,"print_button"));
+  research_button=GTK_WIDGET(gtk_builder_get_object(builder,"research_button"));
+  save_button=GTK_WIDGET(gtk_builder_get_object(builder,"save_button"));
+  add_button=GTK_WIDGET(gtk_builder_get_object(builder,"add_button"));
+  g_signal_connect(print_button,"clicked",G_CALLBACK(if_print_button),NULL);
+  g_signal_connect(research_button,"clicked",G_CALLBACK(if_research_button),NULL);
+  g_signal_connect(save_button,"clicked",G_CALLBACK(if_save_button),NULL);
+  g_signal_connect(add_button,"clicked",G_CALLBACK(if_add_button),NULL);
+
+  gtk_widget_show_all(window);
+
+  gtk_main();
+  g_object_unref(builder);
+  return 1;
 }
+
+void if_print_button(GtkWidget *widget, gpointer data)
+{
+  printf("Print !\n");
+  print_rep();
+  return;
+}
+
+void if_research_button(GtkWidget *widget, gpointer data)
+{
+  printf("Research !\n");
+  find_in_rep();
+  return;
+}
+
+void if_save_button(GtkWidget *widget, gpointer data)
+{
+  printf("Save !\n");
+  save_rep();
+  return;
+}
+
+void if_add_button(GtkWidget *widget, gpointer data)
+{
+  add_profil();
+  printf("Add !\n");
+  return;
+}
+
+/*
+gcc main.c -o prog `pkg-config --cflags --libs gtk+-3.0`
+*/
 
 void input_person(pers *sp)
 {
@@ -130,7 +175,7 @@ int find_in_rep(void)
 		if(strcmp(name_to_find, myRep[i].name)==0)
 		{
 			printf("Trouvé!\n");
-			printf("Num : %s", myRep[i].tel);
+			printf("Num : %s\n", myRep[i].tel);
 			return 1;
 		}
 	}
@@ -198,3 +243,50 @@ void add_profil(void)
 	print_rep();
 	return;
 }
+
+void active_printed_list(void)
+{
+  int i;
+  GtkWidget *hbox;
+
+  GtkListStore *store;
+  GtkTreeIter iter;
+  GtkWidget *tree_view;
+  GtkCellRenderer *renderer;
+  GtkTreeViewColumn *column;
+
+  hbox=GTK_WIDGET(gtk_builder_get_object(builder,"hbox"));
+
+  store=gtk_list_store_new(2,G_TYPE_STRING,G_TYPE_STRING);
+  for(i=0;i<rep_size;i++)
+  {
+    gtk_list_store_append(store,&iter);
+    gtk_list_store_set(store,&iter,0,myRep[i].name,1,myRep[i].tel,-1);
+  }
+  gtk_tree_view_new_with_model(GTK_TREE_MODEL(store));
+  gtk_cell_renderer_text_new();
+  column=gtk_tree_view_column_new_with_attributes("Nom",renderer,"text",0,NULL);
+  gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view),column);
+  column=gtk_tree_view_column_new_with_attributes("Tel",renderer,"text",1,NULL);
+  gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view),column);
+  gtk_box_pack_start(GTK_BOX(hbox),tree_view,FALSE,TRUE,0);
+
+  return;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**/
