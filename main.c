@@ -263,8 +263,8 @@ void active_printed_list(void)
     gtk_list_store_append(store,&iter);
     gtk_list_store_set(store,&iter,0,myRep[i].name,1,myRep[i].tel,-1);
   }
-  gtk_tree_view_new_with_model(GTK_TREE_MODEL(store));
-  gtk_cell_renderer_text_new();
+  tree_view=gtk_tree_view_new_with_model(GTK_TREE_MODEL(store));
+  renderer=gtk_cell_renderer_text_new();
   column=gtk_tree_view_column_new_with_attributes("Nom",renderer,"text",0,NULL);
   gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view),column);
   column=gtk_tree_view_column_new_with_attributes("Tel",renderer,"text",1,NULL);
